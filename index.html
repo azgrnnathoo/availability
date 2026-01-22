@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Availability</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .updated {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        .day-section {
+            margin-bottom: 25px;
+            border-left: 3px solid #4CAF50;
+            padding-left: 15px;
+        }
+        .day-header {
+            font-weight: 600;
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .time-slot {
+            background: #e8f5e9;
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 4px;
+            display: inline-block;
+            font-size: 14px;
+        }
+        .no-availability {
+            color: #999;
+            font-style: italic;
+        }
+        .instructions {
+            margin-top: 30px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Al-Noor's Availability</h1>
+        <div class="updated">Last updated: HTML_START
+
+date "+%B %d, %Y at %I:%M %p" >> "$OUTPUT_FILE"
+
+cat >> "$OUTPUT_FILE" <<'HTML_CONTINUE'
+</div>
+        
+HTML_CONTINUE
+
+# Process each day for the next 14 days
+for day_offset in {0..13}; do
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        CURRENT_DATE=$(date -v+${day_offset}d +%Y-%m-%d)
+        DAY_NAME=$(date -v+${day_offset}d +"%A, %B %d")
+    else
+        CURRENT_DATE=$(date -d "+${day_offset} days" +%Y-%m-%d)
+        DAY_NAME=$(date -d "+${day_offset} days" +"%A, %B %d")
+    fi
+    
+    # Skip weekends (optional - remove these lines if you want to include weekends)
+    DAY_OF_WEEK=$(date -j -f "%Y-%m-%d" "$CURRENT_DATE" +%u)
+    if [ "$DAY_OF_WEEK" -ge 6 ]; then
+        continue
+    fi
+    
+    echo "        <div class='day-section'>" >> "$OUTPUT_FILE"
+    echo "            <div class='day-header'>$DAY_NAME</div>" >> "$OUTPUT_FILE"
+    
+    # Get busy times for this day
+    BUSY_TIMES=$(grep "^$CURRENT_DATE" "$TEMP_EVENTS" | sort)
+    
+    # Generate time slots (9 AM to 5 PM in 1-hour blocks)
+    SLOTS_FOUND=0
+    for hour in {9..16}; do
+        SLOT_START=$(printf "%02d:00" $hour)
+        SLOT_END=$(printf "%02d:00" $((hour + 1)))
+        
+        # Check if this slot conflicts with any busy time
+        IS_FREE=1
+        while IFS='|' read -r event_start event_end event_title; do
+            event_start_time=$(echo "$event_start" | cut -d' ' -f2)
+            event_end_time=$(echo "$event_end" | cut -d' ' -f2)
+            
+            # Simple overlap check
+            if [[ "$SLOT_START" < "$event_end_time" && "$SLOT_END" > "$event_start_time" ]]; then
+                IS_FREE=0
+                break
+            fi
+        done <<< "$BUSY_TIMES"
+        
+        if [ $IS_FREE -eq 1 ]; then
+            echo "            <div class='time-slot'>$SLOT_START - $SLOT_END</div>" >> "$OUTPUT_FILE"
+            SLOTS_FOUND=$((SLOTS_FOUND + 1))
+        fi
+    done
+    
+    if [ $SLOTS_FOUND -eq 0 ]; then
+        echo "            <div class='no-availability'>No availability</div>" >> "$OUTPUT_FILE"
+    fi
+    
+    echo "        </div>" >> "$OUTPUT_FILE"
+done
+
+# Close HTML
+cat >> "$OUTPUT_FILE" <<'HTML_END'
+        
+    </div>
+</body>
+</html>
+HTML_END
+
+# Cleanup
+rm -f "$TEMP_EVENTS"
+
+echo "✅ Availability page generated: $OUTPUT_FILE"
+echo ""
+echo "Next steps:"
+echo "1. Open the HTML file to view your availability"
+echo "2. Host it on a simple web server, or"
+echo "3. Copy the content and paste into your website, or"
+echo "4. Send the HTML file directly to people who need it"
+echo ""
+echo "💡 Tip: Run this script weekly to keep availability current"
